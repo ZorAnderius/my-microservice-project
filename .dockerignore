@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Poetry virtualenvs
+.venv/
+
+# Byte-compiled
+*.egg-info/
+*.egg
+*.log
+*.pot
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Віртуальні середовища
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Тестові файли / артефакти
+*.coverage
+coverage.xml
+htmlcov/
+*.pytest_cache/
+.pytest_cache/
+tests/__pycache__/
+*.log
