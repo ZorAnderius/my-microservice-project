@@ -12,3 +12,13 @@ module "ecr" {
   ecr_name     = local.ecr_name
   scan_on_push = true
 }
+
+module "eks" {
+  source = "./modules/eks"
+  cluster_name = local.cluster_name
+  subnet_ids = module.vpc.public_subnet_ids
+  instance_type = local.instance_type
+  desired_size = local.desired_size
+  max_size = local.max_size
+  min_size = local.min_size
+}
