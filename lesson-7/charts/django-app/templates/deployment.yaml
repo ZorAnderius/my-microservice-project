@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: django
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: POSTGRES_HOST
+              value: "{{ .Values.config.POSTGRES_HOST }}"
+            - name: POSTGRES_PORT
+              value: "{{ .Values.config.POSTGRES_PORT }}"
+            - name: POSTGRES_USER
+              value: "{{ .Values.config.POSTGRES_USER }}"
+            - name: POSTGRES_DB
+              value: "{{ .Values.config.POSTGRES_DB }}"
+            - name: POSTGRES_PASSWORD
+              value: "{{ .Values.secrets.POSTGRES_PASSWORD }}"
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          startupProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - |
+                  until pg_isready -h {{ .Values.config.POSTGRES_HOST }} -p {{ .Values.config.POSTGRES_PORT }} -U {{ .Values.config.POSTGRES_USER }}; do
+                    echo "Waiting for Postgres..."
+                    sleep 5
+                  done
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
