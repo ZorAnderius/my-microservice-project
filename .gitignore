@@ -73,3 +73,5 @@ cython_debug/
 *.tfstate.backup
 .crash
 .terraform.tfstate*
+
+**.env
