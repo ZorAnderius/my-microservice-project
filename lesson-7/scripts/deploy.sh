@@ -74,8 +74,6 @@ if [ -z "$POSTGRES_PASSWORD" ]; then
   POSTGRES_PASSWORD=$(kubectl get secret postgresql -o jsonpath="{.data.password}" | base64 --decode)
 fi
 
-echo "POSTGRES_PASSWORD = '$POSTGRES_PASSWORD'"
-
 echo "Installing Django via Helm..."
 helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
   --set image.repository="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY" \
