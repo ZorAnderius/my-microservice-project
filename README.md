@@ -13,10 +13,10 @@
 ---
 
 ## Опис структури проєкту
-Основна логіка відбувається в директорії lesson-7
+Основна логіка відбувається в директорії lesson-8-9
 
 ```
-lesson-7/
+lesson-8-9/
 ├── terraform/               # Проект Terraform з усіма конфігураціями інфраструктури
 ├── django_app/              # Застосунок Django з Dockerfile
 ├── charts/
@@ -68,7 +68,7 @@ lesson-7/
 ## Підготовка бекенду (S3 + DynamoDB)
 
 ```bash
-cd lesson-7/terraform/modules/s3-backend
+cd lesson-8-9/terraform/modules/s3-backend
 terraform init
 terraform apply
 ```
@@ -103,7 +103,7 @@ terraform apply
 
 ---
 
-Крім того важливою умовою є стоврення в папці **lesson-7** файлу **.env** з таким вмістом 
+Крім того важливою умовою є стоврення в папці **lesson-8-9** файлу **.env** з таким вмістом 
 
 ```bash
 POSTGRES_HOST=postgresql.default.svc.cluster.local
