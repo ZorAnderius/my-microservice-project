@@ -12,59 +12,28 @@ spec:
   containers:
     - name: kaniko
       image: gcr.io/kaniko-project/executor:v1.16.0-debug
-      command: ["sleep"]
-      args: ["99d"]
-    - name: helm
-      image: alpine/helm:3.14.0
-      command: ["sleep"]
-      args: ["99d"]
-    - name: awscli
-      image: amazon/aws-cli
-      command: ["sleep"]
-      args: ["99d"]
-    - name: terraform
-      image: hashicorp/terraform:1.6.3
-      command: ["sleep"]
-      args: ["99d"]
+      imagePullPolicy: Always
+      command:
+        - sleep
+      args:
+        - 99d
     - name: git
       image: alpine/git
-      command: ["sleep"]
-      args: ["99d"]
+      command:
+        - sleep
+      args:
+        - 99d
 """
     }
   }
 
-  environment {
-    IMAGE_TAG     = "v1.0.${BUILD_NUMBER}"
-    COMMIT_EMAIL  = "jenkins@localhost"
-    COMMIT_NAME   = "jenkins"
-  }
+    environment {
+      ECR_REGISTRY = "506421742864.dkr.ecr.eu-central-1.amazonaws.com/lesson-9-chart"
+      IMAGE_NAME   = "app"
+      IMAGE_TAG    = "v1.0.${BUILD_NUMBER}"
 
-  stages {
-    stage('Load AWS & Terraform Vars') {
-      steps {
-        container('awscli') {
-          sh '''
-            echo "Loading dynamic values..."
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-            AWS_REGION=$(terraform output -raw aws_region)
-            ECR_REPOSITORY=$(terraform output -raw ecr_repo_name)
-
-            echo "ECR_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com" > tf_env.sh
-            echo "IMAGE_NAME=$ECR_REPOSITORY" >> tf_env.sh
-          '''
-        }
-      }
-    }
-
-    stage('Export Environment') {
-      steps {
-        script {
-          def props = readProperties file: 'tf_env.sh'
-          env.ECR_REGISTRY = props['ECR_REGISTRY']
-          env.IMAGE_NAME   = props['IMAGE_NAME']
-        }
-      }
+      COMMIT_EMAIL = "jenkins@localhost"
+      COMMIT_NAME  = "jenkins"
     }
 
     stage('Build & Push Docker Image') {
@@ -74,27 +43,13 @@ spec:
             /kaniko/executor \
               --context `pwd`/lesson-8-9/django_app \\
               --dockerfile `pwd`/lesson-8-9/django_app/Dockerfile \\
-              --destination=${env.ECR_REGISTRY}/${env.IMAGE_NAME}:${env.IMAGE_TAG} \
-              --cache=true \
-              --insecure \
+              --destination= $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \\
+              --cache=true \\
+              --insecure \\
               --skip-tls-verify
           """
         }
       }
-    }
-
-    stage('Helm Upgrade') {
-        steps {
-            container('helm') {
-            sh """
-                helm upgrade --install django lesson-8-9/charts/django-app \
-                --namespace default \
-                --atomic \
-                --set image.repository=${env.ECR_REGISTRY}/${env.IMAGE_NAME} \
-                --set image.tag=${env.IMAGE_TAG}
-            """
-            }
-        }
     }
 
     stage('Update Chart in Git (optional)') {
@@ -102,14 +57,15 @@ spec:
         container('git') {
           withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_PAT')]) {
             sh """
-              git config --global user.email "$COMMIT_EMAIL"
-              git config --global user.name "$COMMIT_NAME"
+              git clone https://$GITHUB_USER:$GITHUB_PAT@github.com/$GITHUB_USER/microservice-project.git -b lesson-8-9
+              set -x 
+              cd lesson-8-9/charts/django-app
 
-              git clone https://$GITHUB_USER:$GITHUB_PAT@github.com/$GITHUB_USER/devops.git
-              cd devops/lesson-8-9/charts/django-app
+              sed -i "s|repository:.*|repository: ${ECR_REGISTRY}/${IMAGE_NAME}|" values.yaml
+              sed -i "s|tag:.*|tag: ${IMAGE_TAG}|" values.yaml
 
-              sed -i "s|repository:.*|repository: ${env.ECR_REGISTRY}/${env.IMAGE_NAME}|" values.yaml
-              sed -i "s|tag:.*|tag: ${env.IMAGE_TAG}|" values.yaml
+              git config user.email "$COMMIT_EMAIL"
+              git config user.name "$COMMIT_NAME"
 
               git add values.yaml
               git commit -m "Update image tag to ${env.IMAGE_TAG}"
