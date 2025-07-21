@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "my-microservice-project"
+version = "0.1.0"
+description = ""
+authors = ["ZorAnderius <gabriel.zorander@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+requests = "^2.32.4"
+django = "^5.2.4"
+psycopg = "^3.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

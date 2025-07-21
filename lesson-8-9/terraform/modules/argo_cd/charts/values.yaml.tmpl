@@ -1,0 +1,32 @@
+image:
+  repository: ${ecr_repo_url}
+  tag: latest
+
+applications:
+  - name: django-app
+    namespace: default
+    project: default
+    source:
+      repoURL: ${github_repo_url}
+      path: lesson-8-9/charts/django-app
+      targetRevision: ${github_branch}
+      helm:
+        valueFiles:
+          - values.yaml
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: default
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
+repositories:
+  - name: django-app
+    url: ${github_repo_url}
+    username: ${github_user}
+    password: ${github_token}
+
+repoConfig:
+  insecure: "true"
+  enableLfs: "true"

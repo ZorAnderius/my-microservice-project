@@ -1,0 +1,11 @@
+images:
+  repository: "506421742864.dkr.ecr.eu-central-1.amazonaws.com/lesson-9-chart"
+  tag: "latest"
+  pullPolicy: Always
+
+service:
+  type: LoadBalancer
+  port: 8000
+
+ingress:
+  enabled: false'

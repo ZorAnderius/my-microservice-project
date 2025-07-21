@@ -1,0 +1,13 @@
+lesson-7/django_app/__pycache__
+lesson-7/django_app/*.pyc
+lesson-7/django_app/staticfiles
+lesson-7/django_app/media
+*.git
+.gitignore
+lesson-7/terraform/
+lesson-7/charts/
+lesson-7/scripts/
+nginx/
+docker-compose.yml
+helmfile.yaml
+*.log
