@@ -75,3 +75,5 @@ cython_debug/
 .terraform.tfstate*
 
 **.env
+
+*.tfvars
