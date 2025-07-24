@@ -69,7 +69,6 @@ provider "helm" {
   }
 }
 
-
 module "jenkins" {
   source            = "./modules/jenkins"
   cluster_name      = module.eks.eks_cluster_name
@@ -82,6 +81,7 @@ module "jenkins" {
 
   depends_on = [module.eks]
   providers = {
+    helm       = helm
     kubernetes = kubernetes
   }
 }

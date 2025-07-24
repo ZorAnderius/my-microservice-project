@@ -20,47 +20,52 @@ spec:
     - name: git
       image: alpine/git
       command:
-        - sleep
-      args:
-        - 99d
+        - cat
+      tty: true
 """
     }
   }
 
-    environment {
-      ECR_REGISTRY = "506421742864.dkr.ecr.eu-central-1.amazonaws.com/lesson-9-chart"
-      IMAGE_NAME   = "app"
-      IMAGE_TAG    = "v1.0.${BUILD_NUMBER}"
+  environment {
+    ECR_REGISTRY = "506421742864.dkr.ecr.eu-central-1.amazonaws.com"
+    IMAGE_NAME   = "lesson-9-chart"
+    IMAGE_TAG    = "v1.0.${BUILD_NUMBER}"
 
-      COMMIT_EMAIL = "jenkins@localhost"
-      COMMIT_NAME  = "jenkins"
-    }
+    COMMIT_EMAIL = "jenkins@localhost"
+    COMMIT_NAME  = "jenkins"
+  }
 
+  stages {
     stage('Build & Push Docker Image') {
       steps {
         container('kaniko') {
-          sh """
+          sh '''
+            set -ex
             /kaniko/executor \
-              --context `pwd`/lesson-8-9/django_app \\
-              --dockerfile `pwd`/lesson-8-9/django_app/Dockerfile \\
-              --destination= $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \\
-              --cache=true \\
-              --insecure \\
+              --context=lesson-8-9/django_app \
+              --dockerfile=lesson-8-9/django_app/Dockerfile \
+              --destination=$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+              --cache=true \
+              --insecure \
               --skip-tls-verify
-          """
+          '''
         }
       }
     }
 
-    stage('Update Chart in Git (optional)') {
+    stage('Update Chart in Git') {
       steps {
         container('git') {
           withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'GITHUB_USER', passwordVariable: 'GITHUB_PAT')]) {
-            sh """
-              git clone https://$GITHUB_USER:$GITHUB_PAT@github.com/$GITHUB_USER/microservice-project.git -b lesson-8-9
-              set -x 
+            sh '''
+              set -e
+              echo "Cloning repo and updating Helm chart..."
+              git clone https://$GITHUB_USER:$GITHUB_PAT@github.com/$GITHUB_USER/my-microservice-project.git
+              cd my-microservice-project
+              git checkout lesson-8-9 || git checkout -b lesson-8-9
               cd lesson-8-9/charts/django-app
 
+              # Update values.yaml
               sed -i "s|repository:.*|repository: ${ECR_REGISTRY}/${IMAGE_NAME}|" values.yaml
               sed -i "s|tag:.*|tag: ${IMAGE_TAG}|" values.yaml
 
@@ -68,38 +73,12 @@ spec:
               git config user.name "$COMMIT_NAME"
 
               git add values.yaml
-              git commit -m "Update image tag to ${env.IMAGE_TAG}"
-              git push origin main || true
-            """
+              git commit -m "Update image tag to ${IMAGE_TAG}" || echo "Nothing to commit"
+              git push origin lesson-8-9 || echo "Push failed (possibly no changes)"
+            '''
           }
         }
       }
     }
-
-    // Destroy Helm and Terraform (наприклад, по параметру або окремою гілкою)
-    stage('Destroy Environment') {
-      when {
-        expression { return params.DESTROY == true }
-      }
-      steps {
-        container('helm') {
-          sh '''
-            echo "Uninstalling Helm releases..."
-            helm list --short --namespace default | xargs -r -n1 helm uninstall --namespace default || true
-          '''
-        }
-        container('terraform') {
-          sh '''
-            echo "☠️ Running terraform destroy..."
-            terraform init
-            terraform destroy -auto-approve
-          '''
-        }
-      }
-    }
-  }
-
-  parameters {
-    booleanParam(name: 'DESTROY', defaultValue: false, description: 'Set to true to destroy all resources')
   }
 }
