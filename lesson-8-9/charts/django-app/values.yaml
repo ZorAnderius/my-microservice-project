@@ -1,6 +1,6 @@
 images:
   repository: 506421742864.dkr.ecr.eu-central-1.amazonaws.com/lesson-9-chart
-  tag: v1.0.6
+  tag: v1.0.7
   pullPolicy: IfNotPresent
 
 service:
