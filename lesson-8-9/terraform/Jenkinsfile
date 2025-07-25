@@ -73,7 +73,7 @@ spec:
               git config user.name "$COMMIT_NAME"
 
               git add values.yaml
-              git commit -m "Update image tag to ${IMAGE_TAG}" || echo "Nothing to commit"
+              git commit -m "Update image tag to ${IMAGE_TAG} [ci skip]" || echo "Nothing to commit"
               git push origin lesson-8-9 || echo "Push failed (possibly no changes)"
             '''
           }

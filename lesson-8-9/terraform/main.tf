@@ -61,6 +61,46 @@ provider "kubernetes" {
   token                  = data.aws_eks_cluster_auth.eks.token
 }
 
+# resource "kubernetes_namespace" "argocd" {
+#   metadata {
+#     name = "argocd"
+#   }
+# }
+
+
+# data "aws_ecr_authorization_token" "token" {}
+
+# locals {
+#   decoded_auth_token = base64decode(data.aws_ecr_authorization_token.token.authorization_token)
+#   password           = split(":", local.decoded_auth_token)[1]
+#   auth_string        = "AWS:${local.password}"
+# }
+
+# resource "kubernetes_secret" "ecr_secret_argocd" {
+#   metadata {
+#     name      = "ecr-registry-secret"
+#     namespace = "argocd"
+#   }
+
+#   type = "kubernetes.io/dockerconfigjson"
+
+#   data = {
+#     ".dockerconfigjson" = base64encode(jsonencode({
+#       auths = {
+#         "506421742864.dkr.ecr.eu-central-1.amazonaws.com" = {
+#           username = "AWS"
+#           password = local.password
+#           email    = "none"
+#           auth     = base64encode(local.auth_string)
+#         }
+#       }
+#     }))
+#   }
+
+#   depends_on = [module.eks, kubernetes_namespace.argocd]
+# }
+
+
 provider "helm" {
   kubernetes = {
     host                   = data.aws_eks_cluster.eks.endpoint
