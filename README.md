@@ -3,11 +3,9 @@
 ## Зміст
 
 - [Опис структури проєкту](#опис-структури-проєкту)
-- [Підготовка бекенду (S3 + DynamoDB)](#підготовка-бекенду-s3--dynamodb)
-- [Запуск основної інфраструктури](#запуск-основної-інфраструктури)
-- [Kubernetes та Helm](#kubernetes-та-helm)
-- [Деплой Django-застосунку](#деплой-django-застосунку)
-- [Очікування LoadBalancer та відкриття застосунку](#очікування-loadbalancer-та-відкриття-застосунку)
+- [Підготовка бекенду (S3 + DynamoDB) та запуск основної інфраструктури)](#підготовка-бекенду-s3--dynamodb-запуск-основної-інфраструктури)
+- [Інструкція по використанню Jenkins and ArgoCD](#інструкція-по-використанню-jenkins-and-argocd)
+- [Bідкриття застосунку](#відкриття-застосунку)
 - [Опис CI/CD архітектури](#опис-cicd-архітектури)
 - [Робота CI/CD архітектури](#робота-cicd-архітектури)
 - [Видалення інфраструктури](#видалення-інфраструктури)
@@ -125,139 +123,75 @@ lesson-8-9/
 ---
 
 
-## Підготовка бекенду (S3 + DynamoDB)
+## Підготовка бекенду (S3 + DynamoDB) та створення основної інфраструктури
+
+Для створення:
+
+ - S3 bucket для зберігання terraform.tfstate
+ - DynamoDB таблицю для блокування
+ - VPC, кластер EKS, репозиторій ECR тощо.
+
+Радимо використовувати готовий скрипт, який не тільки розгорне інфраструктуру, а й зразу заєднається з Kubernetes та надасть посилання для Jenkins, ArgoCD та нашого застовунку django-app
+
+
 
 ```bash
-cd lesson-8-9/terraform/modules/s3-backend
-terraform init
-terraform apply
+cd lesson-8-9/scripts
+./init-all.sh
 ```
 
-> Це створить:
-> - S3 bucket для зберігання terraform.tfstate
-> - DynamoDB таблицю для блокування
+Результатом роботи цього скрипта будуть посилання на відповідні ресурси, які показані на малюнку
+![Посилання на резурси Jenkins, ArgoCD та django-app з паролями та username](assets/links_and_passswords.jpg)
+
 
 ---
 
-## Запуск основної інфраструктури
 
-Після створення бекенду:
+## Інструкція по використанню Jenkins and ArgoCD
 
-```bash
-cd ../..         # Повернення в директорію terraform
-terraform init
-terraform apply
-```
+### Jenkins 
 
-> Це створить VPC, кластер EKS, репозиторій ECR тощо.
+Перш за все потрібно дозволити роботу **seed-job** для цього переходимо за посиланням з попереднього пункту та вводимо відновідні логін та пароль. Як результат буде наступний Dashboard Jenkins
 
----
+![Головний Dashboard Jenkins з seed-job](assets/jenkins1.jpg)
 
-## Kubernetes та Helm
+Наступним кроком буде підтвердження скрипта для виконання цієї job. Для цього потрібно перейти на **Manage Jenkins** та знайти секцію **In-process Script Approve**
 
-### Встановлення
+![In-process Script Approve](assets/jenkins2.jpg)
 
-Перед початком якщо дані інстурменти є відсутні то будт ласка встановіть їх:
-- Встанови [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- Встанови [helm](https://helm.sh/docs/intro/install/)
+Далі підтверджуємо скрипт (натискємо кнопку **Approve**) та переходимо до **My views**
 
----
+![Підтвердження скрипта для seed-job](assets/jenkins3.jpg)
 
-Крім того важливою умовою є стоврення в папці **lesson-8-9** файлу **.env** з таким вмістом 
+Після чого переходимо до **seed-job**
 
-```bash
-POSTGRES_HOST=postgresql.default.svc.cluster.local
-POSTGRES_PORT=5432
-POSTGRES_USER=django_user
-POSTGRES_DB=django_db
-POSTGRES_PASSWORD=pass9764gd
-```
+![Головний Dashboard Jenkins з seed-job](assets/jenkins4.jpg)
 
-## Деплой Django-застосунку
+та запускаємо buid нашого pipeline
 
-Скрипт: `scripts/deploy.sh`
+![Build pipeline з seed-job](assets/jenkins5.jpg)
 
+і як результат через деякий час (5-10 хв) в  Dashboard Jenkins зявиться нова job **django-docker**
 
-- Скрипт `deploy.sh` **повинен запускатися з папки `terraform`**, оскільки він працює з результатами, які створює Terraform, наприклад, отримує URL кластеру, ECR репозиторій та інші змінні середовища.
-
-
-### Формат:
-
-```bash
-../scripts/deploy.sh <project-name> <dockerfile-path> <context-dir> <release-name> <helm-chart-path>
-```
-
-### Приклад:
-
-```bash
-../scripts/deploy.sh django-app ../django_app/Dockerfile ../django_app django-release ../charts/django-app
-```
-
-### Пояснення:
-
-| Аргумент              | Опис                                                                 |
-|-----------------------|----------------------------------------------------------------------|
-| `django-app`          | Назва Docker образу та ECR репозиторію                              |
-| `../django_app/Dockerfile` | Шлях до Dockerfile                                              |
-| `../django_app`       | Контекст збірки Docker (звiдки копіюються файли)                    |
-| `django-release`      | Назва Helm-релізу                                                    |
-| `../charts/django-app`| Шлях до Helm-чарту                                                   |
+![Результат запуску seed-job та формування і build django-docker job](assets/jenkins6.jpg)
 
 ---
 
-## Очікування LoadBalancer та відкриття застосунку
+### ArgoCD
 
->  Створення LoadBalancer у AWS може тривати **кілька хвилин** після деплою. Потрібно дочекатися, доки з'явиться зовнішній IP.
+Після завершення job django-docker з Jenkins в нас в **ecr** є образ нашого застосунку.
+Тому для перевірки стану застосунку потрібно перейти за посиланням яке отримуємо після заверешення встановлення інфраструктури та ввеси відновідні пароль на логін. В отриманому Dashboard вибираємо застосунок django-app і превіряємо його стан.
 
-1. Перевір статус LoadBalancer:
+![Django-app  в ArgoCD](assets/argo_cd.jpg)
 
-```bash
-kubectl get svc django-release -w
-```
-
-> Якщо `-w` не показує результат довго — натисни Ctrl+C і повтори через хвилину.
-
-Знайди значення у колонці EXTERNAL-IP, наприклад:
-
-```scss
-NAME              TYPE           EXTERNAL-IP                                                                  PORT(S)
-django-release    LoadBalancer   a18449ed0e0234cb1a897483b161b866-935326661.eu-central-1.elb.amazonaws.com   8000:...
-
-```
-
-2. Відкрий у браузері:
-
-```
-http://<external-dns>:8000
-```
-
-або:
-
-```bash
-curl http://<external-dns>:8000
-```
-
-
-3. Первірка DNS під час очікування LoadBalancer
-
-Поки DNS не працює, можеш тимчасово зробити порт-форвардинг:
-
-```bash
-kubectl port-forward svc/django-release 8000:8000
-```
-
-І потім відкрий у браузері:
-
-
-```bash
-http://localhost:8000
-```
-
-
-Якщо це працює — значить, Django вже доступний, просто DNS ще не "дозрів".
 
 ---
 
+## Відкриття застосунку
+
+Відкриття застосунку django-app повинно бути здійснено після перевірки роботи його в argoCD. Крім того, можливий випадок,коли потрібно зачекати до 10 хв, поки loadBalancer застосунку розгорнеться. Тому якшо перехід по посиланню яке отримано в кінці роботи скрипта по розгортанню інфраструктури, містить помилку підключення, спробуйте зайти на ресурс через декілька хвилин.
+
+![Django-app  в браузері](assets/django.jpg)
 
 ## Опис CI/CD архітектури
 ```sass
@@ -337,18 +271,7 @@ http://localhost:8000
 
 
 ## Видалення інфраструктури
-Якщо потрібно видалити створені ресурси, то необхідно спочатку вручну знищити Helm-реліз (який створює LoadBalancer):
 
-1. Перевір назву Helm-релізу (наприклад django-release):
-
-```bash
-helm list
-```
-
-2. Видали реліз:
-
-
-### За допомогою скрипта
 
 Для видалення всіх встановлених ресурсів рекомендується з папки **scripts**
 
@@ -360,54 +283,8 @@ cd lesson-8-9/scripts
 запустити скрипт
 
 ```bash
-./delete-all-recourses.sh
+./delete-all.sh
 ```
 
-### Ручне видалення
-
-Для уникнення помилока при видаленні  перш за все потрібно видалити Jankins:
-
-Jankins
-
-```bash
-helm uninstall jenkins -n jenkins
-```
-
-потім
-
-
-```bash
-kubectl delete pvc --all -n jenkins
-```
-
-та
-
-```bash
-kubectl delete namespace jenkins
-```
-
-а потім з папки **terraform** 
-```bash
-cd "$(git rev-parse --show-toplevel)"
-cd lesson-8-9/terraform
-```
-
-виконати наступну команду
-
-```bash
-terraform destroy
-```
-
-і на останок перейти в папку **s3-backend**
-```bash
-cd "$(git rev-parse --show-toplevel)"
-cd lesson-8-9/terraform/modules/s3-backend
-```
-та виконати 
-
-```bash
-terraform destroy
-```
-
-для знищення s3 bucket та dynamoDB.
+даний скрипт знищить не тільки встановлені ресурси, але й ресурси які були створені поза Terraform. І якшо їх залишити то видалення через команду terraform destroy може завершитись з помилкою.
 ---
