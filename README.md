@@ -136,6 +136,7 @@ lesson-8-9/
 
 
 ```bash
+cd "$(git rev-parse --show-toplevel)"
 cd lesson-8-9/scripts
 ./init-all.sh
 ```
