@@ -69,6 +69,32 @@ done
 echo "Очікування 20 сек для завершення видалення Load Balancer-ів..."
 sleep 20
 
+
+echo "=== [2.2/6] Видалення orphaned Route Tables ==="
+
+ALL_RTS=$(aws ec2 describe-route-tables \
+  --filters Name=vpc-id,Values="$VPC_ID" \
+  --region "$AWS_REGION" \
+  --query "RouteTables[].RouteTableId" \
+  --output text || echo "")
+
+TF_RTS=$(terraform -chdir="$TERRAFORM_DIR" state list | grep aws_route_table || true)
+
+TF_RTS_IDS=""
+for rt in $TF_RTS; do
+  rt_id=$(terraform -chdir="$TERRAFORM_DIR" state show -no-color "$rt" 2>/dev/null | grep "id =" | awk '{print $3}' || true)
+  TF_RTS_IDS+="$rt_id"$'\n'
+done
+
+for rt_id in $ALL_RTS; do
+  if ! echo "$TF_RTS_IDS" | grep -q "$rt_id"; then
+    echo "🗑 Видаляємо Route Table (не Terraform): $rt_id"
+    aws ec2 delete-route-table --route-table-id "$rt_id" --region "$AWS_REGION" || true
+  else
+    echo "✅ Route Table керується Terraform: $rt_id"
+  fi
+done
+
 echo "=== [3/6] Видалення Helm-релізів ==="
 
 uninstall_helm_release() {
