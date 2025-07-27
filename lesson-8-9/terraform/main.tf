@@ -61,46 +61,6 @@ provider "kubernetes" {
   token                  = data.aws_eks_cluster_auth.eks.token
 }
 
-# resource "kubernetes_namespace" "argocd" {
-#   metadata {
-#     name = "argocd"
-#   }
-# }
-
-
-# data "aws_ecr_authorization_token" "token" {}
-
-# locals {
-#   decoded_auth_token = base64decode(data.aws_ecr_authorization_token.token.authorization_token)
-#   password           = split(":", local.decoded_auth_token)[1]
-#   auth_string        = "AWS:${local.password}"
-# }
-
-# resource "kubernetes_secret" "ecr_secret_argocd" {
-#   metadata {
-#     name      = "ecr-registry-secret"
-#     namespace = "argocd"
-#   }
-
-#   type = "kubernetes.io/dockerconfigjson"
-
-#   data = {
-#     ".dockerconfigjson" = base64encode(jsonencode({
-#       auths = {
-#         "506421742864.dkr.ecr.eu-central-1.amazonaws.com" = {
-#           username = "AWS"
-#           password = local.password
-#           email    = "none"
-#           auth     = base64encode(local.auth_string)
-#         }
-#       }
-#     }))
-#   }
-
-#   depends_on = [module.eks, kubernetes_namespace.argocd]
-# }
-
-
 provider "helm" {
   kubernetes = {
     host                   = data.aws_eks_cluster.eks.endpoint
@@ -137,5 +97,50 @@ module "argo_cd" {
   ecr_repo_url    = local.ecr_repo_url
 
   depends_on = [module.eks]
+}
+
+module "rds" {
+  source = "./modules/rds"
+
+  name                  = "${var.rds_database_name}-db"
+  use_aurora            = var.rds_use_aurora
+  aurora_instance_count = 2
+  vpc_cidr_block        = module.vpc.vpc_cidr_block
+
+  # --- Aurora-only ---
+  engine_cluster                = var.rds_aurora_engine
+  engine_version_cluster        = var.rds_aurora_engine_version
+  parameter_group_family_aurora = var.rds_aurora_parameter_group_family
+
+
+  # --- RDS-only ---
+  engine                     = var.rds_instance_engine
+  engine_version             = var.rds_instance_engine_version
+  parameter_group_family_rds = var.rds_instance_parameter_group_family
+
+  # Common
+  instance_class          = var.rds_instance_class
+  allocated_storage       = 20
+  db_name                 = var.rds_database_name
+  username                = var.rds_username
+  password                = var.rds_password
+  subnet_private_ids      = module.vpc.private_subnets
+  subnet_public_ids       = module.vpc.public_subnets
+  publicly_accessible     = var.rds_publicly_accessible
+  vpc_id                  = module.vpc.vpc_id
+  multi_az                = var.rds_multi_az
+  backup_retention_period = var.rds_backup_retention_period
+  parameters              = {
+    max_connections            = "200"
+    log_min_duration_statement = "500"
+  }
+
+  tags = {
+    Environment = "dev"
+    Project     = var.rds_database_name
+  }
+  depends_on = [
+    module.vpc
+  ]
 }
 
