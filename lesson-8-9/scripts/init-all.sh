@@ -11,13 +11,18 @@ terraform init
 terraform apply -auto-approve
 popd > /dev/null
 
-echo "2. Деплой інфраструктури (terraform apply)..."
+echo "2. Оновлення залежностей Helm чарта для argo_apps..."
+pushd "$PROJECT_ROOT/lesson-8-9/terraform/modules/argo_cd/charts" > /dev/null
+helm dependency update
+popd > /dev/null
+
+echo "3. Деплой інфраструктури (terraform apply)..."
 pushd "$PROJECT_ROOT/lesson-8-9/terraform" > /dev/null
 terraform init
 terraform apply -auto-approve
 popd > /dev/null
 
-echo "3. Оновлення kubeconfig для EKS..."
+echo "4. Оновлення kubeconfig для EKS..."
 
 export AWS_REGION=$(terraform -chdir="$PROJECT_ROOT/lesson-8-9/terraform" output -raw aws_region)
 export EKS_CLUSTER_NAME=$(terraform -chdir="$PROJECT_ROOT/lesson-8-9/terraform" output -raw eks_cluster_name)

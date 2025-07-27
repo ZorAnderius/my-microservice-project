@@ -1,7 +1,7 @@
 # Aurora Cluster
 resource "aws_rds_cluster" "aurora" {
   count                           = var.use_aurora ? 1 : 0
-  cluster_identifier              = "${var.name}-cluster"
+  cluster_identifier              = "${replace(lower(var.name), "_", "-")}-cluster"
   engine                          = var.engine_cluster
   engine_version                  = var.engine_version_cluster
   master_username                 = var.username
@@ -11,7 +11,7 @@ resource "aws_rds_cluster" "aurora" {
   vpc_security_group_ids          = [aws_security_group.rds.id]
   backup_retention_period         = var.backup_retention_period
   skip_final_snapshot             = false
-  final_snapshot_identifier       = "${var.name}-final-snapshot"  
+  final_snapshot_identifier       = "${replace(lower(var.name), "_", "-")}-final-snapshot"  
   db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.aurora[0].name
 
   tags = var.tags
@@ -20,7 +20,7 @@ resource "aws_rds_cluster" "aurora" {
 # Writer instance
 resource "aws_rds_cluster_instance" "aurora_writer" {
   count                = var.use_aurora ? 1 : 0
-  identifier           = "${var.name}-writer"
+  identifier           = "${replace(lower(var.name), "_", "-")}-writer"
   cluster_identifier   = aws_rds_cluster.aurora[0].id
   instance_class       = var.instance_class
   engine               = var.engine_cluster
@@ -33,7 +33,7 @@ resource "aws_rds_cluster_instance" "aurora_writer" {
 # Reader replicas
 resource "aws_rds_cluster_instance" "aurora_readers" {
   count                = var.use_aurora ? var.aurora_replica_count : 0
-  identifier           = "${var.name}-reader-${count.index}"
+  identifier           = "${replace(lower(var.name), "_", "-")}-reader-${count.index}"
   cluster_identifier   = aws_rds_cluster.aurora[0].id
   instance_class       = var.instance_class
   engine               = var.engine_cluster
@@ -46,7 +46,7 @@ resource "aws_rds_cluster_instance" "aurora_readers" {
 # Aurora parameter group
 resource "aws_rds_cluster_parameter_group" "aurora" {
   count       = var.use_aurora ? 1 : 0
-  name        = "${var.name}-aurora-params"
+  name        = "${replace(lower(var.name), "_", "-")}-aurora-params"
   family      = var.parameter_group_family_aurora
   description = "Aurora PG for ${var.name}"
 

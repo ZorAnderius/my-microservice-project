@@ -128,8 +128,8 @@ module "rds" {
   db_name                 = var.rds_database_name
   username                = var.rds_username
   password                = var.rds_password
-  subnet_private_ids      = module.vpc.private_subnets
-  subnet_public_ids       = module.vpc.public_subnets
+  subnet_private_ids      = module.vpc.private_subnet_ids
+  subnet_public_ids       = module.vpc.public_subnet_ids
   publicly_accessible     = var.rds_publicly_accessible
   vpc_id                  = module.vpc.vpc_id
   multi_az                = var.rds_multi_az
