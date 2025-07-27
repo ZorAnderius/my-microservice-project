@@ -1,3 +1,9 @@
+variable "vpc_cidr_block" {
+    description = "IP VPC"
+  type        = string
+}
+
+
 variable "name" {
   description = "Назва інстансу або кластера"
   type        = string
