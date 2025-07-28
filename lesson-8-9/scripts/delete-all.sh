@@ -16,11 +16,22 @@ if [[ -z "$VPC_ID" || -z "$AWS_REGION" ]]; then
   exit 1
 fi
 
+is_k8s_available() {
+  if command -v kubectl >/dev/null 2>&1 && kubectl version --short &>/dev/null; then
+    return 0
+  else
+    return 1
+  fi
+}
+
 clean_helm_apps() {
   echo "Очищення Helm-релізів Jenkins та ArgoCD"
-
   if ! command -v helm >/dev/null 2>&1; then
     echo "helm не знайдено — пропускаємо Helm cleanup"
+    return
+  fi
+  if ! is_k8s_available; then
+    echo "Kubernetes недоступний — пропускаємо Helm cleanup"
     return
   fi
 
@@ -37,9 +48,8 @@ clean_helm_apps() {
 
 clean_kubernetes_namespaces() {
   echo "Видалення namespace-ів Jenkins та ArgoCD"
-
-  if ! command -v kubectl >/dev/null 2>&1; then
-    echo "kubectl не знайдено — пропускаємо cleanup namespaces"
+  if ! is_k8s_available; then
+    echo "Kubernetes недоступний — пропускаємо cleanup namespaces"
     return
   fi
 
@@ -52,8 +62,8 @@ clean_kubernetes_namespaces() {
 
 clean_argocd_crds() {
   echo "Видалення CRD ArgoCD (якщо залишились)"
-
-  if ! command -v kubectl >/dev/null 2>&1; then
+  if ! is_k8s_available; then
+    echo "Kubernetes недоступний — пропускаємо cleanup CRDs"
     return
   fi
 
@@ -62,9 +72,8 @@ clean_argocd_crds() {
   done
 }
 
-
 clean_load_balancers() {
-  echo "===  Видалення Load Balancer-ів, не керованих Terraform ==="
+  echo "=== Видалення Load Balancer-ів, не керованих Terraform ==="
 
   # --- ALB/NLB (aws_lb) ---
   ALL_LBS=$(aws elbv2 describe-load-balancers --region "$AWS_REGION" \
@@ -114,7 +123,6 @@ clean_load_balancers() {
   sleep 20
 }
 
-
 try_delete_vpc() {
   echo "Спроба видалити VPC: $VPC_ID"
 
@@ -148,6 +156,26 @@ try_delete_vpc() {
   }
 }
 
+delete_rds_final_snapshot() {
+  echo "Перевіряємо і видаляємо фінальний сніпшот RDS, якщо існує"
+
+  SNAPSHOT_ID="django-db-db-final-snapshot"
+  
+  if aws rds describe-db-cluster-snapshots --db-cluster-snapshot-identifier "$SNAPSHOT_ID" --region "$AWS_REGION" &>/dev/null; then
+    echo "Знайдено фінальний сніпшот $SNAPSHOT_ID, видаляємо..."
+    aws rds delete-db-cluster-snapshot --db-cluster-snapshot-identifier "$SNAPSHOT_ID" --region "$AWS_REGION"
+    
+    echo "Очікуємо поки сніпшот видалиться..."
+    while aws rds describe-db-cluster-snapshots --db-cluster-snapshot-identifier "$SNAPSHOT_ID" --region "$AWS_REGION" &>/dev/null; do
+      sleep 5
+      echo "Чекаємо..."
+    done
+    
+    echo "Сніпшот видалено."
+  else
+    echo "Фінальний сніпшот $SNAPSHOT_ID не знайдено — нічого видаляти"
+  fi
+}
 
 clean_blocking_resources() {
   clean_load_balancers
@@ -162,6 +190,7 @@ cd "$TERRAFORM_DIR"
 clean_blocking_resources
 
 echo "[5/6] Terraform destroy: перша спроба"
+delete_rds_final_snapshot
 if terraform destroy -auto-approve; then
   echo "Terraform destroy успішно завершено"
 else
@@ -181,8 +210,7 @@ BUCKET_NAME=$(terraform output -raw bucket_name 2>/dev/null || echo "")
 if [[ -n "$BUCKET_NAME" ]]; then
   echo "Очищення бакету S3: $BUCKET_NAME"
   aws s3 rm "s3://$BUCKET_NAME" --recursive || true
+  aws s3api delete-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" || true
+else
+  echo "S3 bucket не знайдено, пропускаємо очищення"
 fi
-
-terraform destroy -auto-approve || echo "Не вдалося повністю видалити backend"
-
-echo "Інфраструктура повністю успішно очищена."
