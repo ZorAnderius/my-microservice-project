@@ -98,7 +98,7 @@ module "argo_cd" {
   rds_db_name   = var.rds_database_name
   rds_username  = var.rds_username
   rds_password  = var.rds_password
-  rds_endpoint  = split(":", module.rds.rds_endpoint)[0] 
+  rds_endpoint  = module.rds.rds_endpoint
 
   depends_on = [module.eks]
 }
