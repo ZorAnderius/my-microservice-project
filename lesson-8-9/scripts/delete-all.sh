@@ -209,7 +209,23 @@ BUCKET_NAME=$(terraform output -raw bucket_name 2>/dev/null || echo "")
 
 if [[ -n "$BUCKET_NAME" ]]; then
   echo "Очищення бакету S3: $BUCKET_NAME"
+
+  # Якщо включено версіонування — очищаємо всі версії
+  if aws s3api get-bucket-versioning --bucket "$BUCKET_NAME" | grep -q Enabled; then
+    echo "Бакет версіонований — видаляємо всі версії..."
+    
+    aws s3api list-object-versions --bucket "$BUCKET_NAME" --output json | jq -c '.Versions[]?, .DeleteMarkers[]?' |
+      while read -r obj; do
+        key=$(echo "$obj" | jq -r '.Key')
+        versionId=$(echo "$obj" | jq -r '.VersionId')
+        aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$versionId"
+      done
+  fi
+
+  # Очищаємо звичайні об'єкти (на всяк випадок)
   aws s3 rm "s3://$BUCKET_NAME" --recursive || true
+
+  # Видаляємо сам бакет
   aws s3api delete-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" || true
 else
   echo "S3 bucket не знайдено, пропускаємо очищення"

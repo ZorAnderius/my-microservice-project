@@ -38,6 +38,61 @@ echo "Kubeconfig оновлено!"
 echo ""
 echo "🔗 Збираємо доступи до сервісів..."
 
+TFVARS_FILE="$PROJECT_ROOT/lesson-8-9/terraform/terraform.tfvars"
+
+get_tfvar() {
+  local var_name="$1"
+  grep "^${var_name} *= *" "$TFVARS_FILE" | head -n1 | sed -E "s/^${var_name} *= *\"?([^\"]*)\"?/\1/"
+}
+
+echo "Парсимо змінні з terraform.tfvars..."
+
+POSTGRES_USER=$(get_tfvar "rds_username")
+POSTGRES_DB=$(get_tfvar "rds_database_name")
+POSTGRES_PASSWORD=$(get_tfvar "rds_password")
+POSTGRES_PORT=$(get_tfvar "db_port")
+POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+
+echo "Отримуємо POSTGRES_HOST з terraform output..."
+POSTGRES_HOST=$(terraform -chdir="$PROJECT_ROOT/lesson-8-9/terraform" output -raw rds_endpoint)
+
+: "${POSTGRES_HOST:?Помилка: POSTGRES_HOST не заданий}"
+: "${POSTGRES_DB:?Помилка: POSTGRES_DB не заданий у terraform.tfvars}"
+: "${POSTGRES_USER:?Помилка: POSTGRES_USER не заданий у terraform.tfvars}"
+: "${POSTGRES_PASSWORD:?Помилка: POSTGRES_PASSWORD не заданий у terraform.tfvars}"
+
+SECRET_NAMESPACE="default"
+SECRET_NAME="django-app-secret"
+
+kubectl apply -n "$SECRET_NAMESPACE" -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: $SECRET_NAME
+type: Opaque
+stringData:
+  POSTGRES_HOST: "$POSTGRES_HOST"
+  POSTGRES_DB: "$POSTGRES_DB"
+  POSTGRES_USER: "$POSTGRES_USER"
+  POSTGRES_PASSWORD: "$POSTGRES_PASSWORD"
+  POSTGRES_PORT: "$POSTGRES_PORT"
+EOF
+
+echo "Секрет $SECRET_NAME оновлено в namespace $SECRET_NAMESPACE"
+
+echo "Перевіряємо і створюємо/оновлюємо Kubernetes секрет: $SECRET_NAME у namespace $SECRET_NAMESPACE"
+
+kubectl create secret generic "$SECRET_NAME" \
+  --namespace "$SECRET_NAMESPACE" \
+  --from-literal=POSTGRES_HOST="$POSTGRES_HOST" \
+  --from-literal=POSTGRES_DB="$POSTGRES_DB" \
+  --from-literal=POSTGRES_USER="$POSTGRES_USER" \
+  --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+  --from-literal=POSTGRES_PORT="$POSTGRES_PORT" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "Секрет $SECRET_NAME оновлено!"
+
 # --- ArgoCD ---
 ARGOCD_COMMAND=$(terraform -chdir="$PROJECT_ROOT/lesson-8-9/terraform" output -raw argocd_admin_password 2>/dev/null || echo "")
 
