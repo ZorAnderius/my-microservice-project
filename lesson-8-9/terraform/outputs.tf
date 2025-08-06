@@ -52,3 +52,7 @@ output "argocd_admin_password" {
   description = "Initial admin password"
   value       = module.argo_cd.admin_password
 }
+
+output "rds_endpoint" {
+  value = module.rds.rds_endpoint
+}

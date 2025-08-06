@@ -42,7 +42,7 @@ TFVARS_FILE="$PROJECT_ROOT/lesson-8-9/terraform/terraform.tfvars"
 
 get_tfvar() {
   local var_name="$1"
-  grep "^${var_name} *= *" "$TFVARS_FILE" | head -n1 | sed -E "s/^${var_name} *= *\"?([^\"]*)\"?/\1/"
+  awk -F '=' -v var="$var_name" '$1 ~ var { gsub(/^[ \t]+|[ \t]+$/, "", $2); gsub(/^"|"$/, "", $2); print $2 }' "$TFVARS_FILE" | head -n1
 }
 
 echo "Парсимо змінні з terraform.tfvars..."
