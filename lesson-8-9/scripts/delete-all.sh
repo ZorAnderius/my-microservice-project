@@ -204,6 +204,7 @@ else
 fi
 
 echo "[6/6] Видалення S3 backend"
+
 cd "$S3_BACKEND_DIR"
 
 BUCKET_NAME=$(terraform output -raw s3_bucket 2>/dev/null || echo "")
@@ -211,35 +212,41 @@ BUCKET_NAME=$(terraform output -raw s3_bucket 2>/dev/null || echo "")
 if [[ -n "$BUCKET_NAME" ]]; then
   echo "Очищення бакету S3: $BUCKET_NAME"
 
-  # Якщо включено версіонування — очищаємо всі версії
+  # Перевірка, чи включено версіонування
   if aws s3api get-bucket-versioning --bucket "$BUCKET_NAME" | grep -q Enabled; then
-    echo "Бакет версіонований — видаляємо всі версії..."
+    echo "Бакет версіонований — видаляємо всі версії та delete markers..."
 
-    aws s3api list-object-versions --bucket "$BUCKET_NAME" \
-      --query='Versions[].{Key:Key,VersionId:VersionId}' \
-      --output=text |
-      while read -r key version_id; do
-        echo "Видалення об'єкта: $key версія: $version_id"
-        aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" || true
+    # Пагінована обробка (на випадок великої кількості об'єктів)
+    NEXT_TOKEN=""
+    while true; do
+      if [[ -z "$NEXT_TOKEN" ]]; then
+        OUTPUT=$(aws s3api list-object-versions --bucket "$BUCKET_NAME" --output text)
+      else
+        OUTPUT=$(aws s3api list-object-versions --bucket "$BUCKET_NAME" --starting-token "$NEXT_TOKEN" --output text)
+      fi
+
+      echo "$OUTPUT" | grep -E "VERSIONS|DELETEMARKERS" |
+      while read -r TYPE KEY VERSION_ID REST; do
+        if [[ -n "$VERSION_ID" ]]; then
+          echo "Видалення об'єкта: $KEY (версія: $VERSION_ID)"
+          aws s3api delete-object --bucket "$BUCKET_NAME" --key "$KEY" --version-id "$VERSION_ID" || true
+        fi
       done
 
-    aws s3api list-object-versions --bucket "$BUCKET_NAME" \
-      --query='DeleteMarkers[].{Key:Key,VersionId:VersionId}' \
-      --output=text |
-      while read -r key version_id; do
-        echo "Видалення маркера: $key версія: $version_id"
-        aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" || true
-      done
+      NEXT_TOKEN=$(echo "$OUTPUT" | grep "NEXTTOKEN" | awk '{print $2}')
+      [[ -z "$NEXT_TOKEN" ]] && break
+    done
   fi
 
-  # Очищення звичайних об'єктів (якщо залишились)
-  echo "Видаляємо всі об'єкти (звичайна очистка)..."
+  echo "Видаляємо всі стандартні об'єкти (на випадок)..."
   aws s3 rm "s3://$BUCKET_NAME" --recursive || true
 
-  # Видаляємо сам бакет
+  echo "Видалення бакету..."
   aws s3api delete-bucket --bucket "$BUCKET_NAME" --region "$AWS_REGION" || true
+
+  echo "✅ Бакет успішно очищено і видалено"
 else
-  echo "S3 bucket не знайдено, пропускаємо очищення"
+  echo "⚠️ S3 bucket не знайдено, пропускаємо очищення"
 fi
 
 
