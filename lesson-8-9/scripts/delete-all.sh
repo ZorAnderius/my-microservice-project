@@ -205,7 +205,7 @@ fi
 
 echo "[6/6] Видалення S3 backend"
 cd "$S3_BACKEND_DIR"
-BUCKET_NAME=$(terraform output -raw bucket_name 2>/dev/null || echo "")
+BUCKET_NAME=$(terraform output -raw s3_bucket 2>/dev/null || echo "")
 
 if [[ -n "$BUCKET_NAME" ]]; then
   echo "Очищення бакету S3: $BUCKET_NAME"
