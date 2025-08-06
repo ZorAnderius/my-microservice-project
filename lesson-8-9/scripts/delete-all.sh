@@ -205,6 +205,7 @@ fi
 
 echo "[6/6] Видалення S3 backend"
 cd "$S3_BACKEND_DIR"
+
 BUCKET_NAME=$(terraform output -raw s3_bucket 2>/dev/null || echo "")
 
 if [[ -n "$BUCKET_NAME" ]]; then
@@ -213,16 +214,26 @@ if [[ -n "$BUCKET_NAME" ]]; then
   # Якщо включено версіонування — очищаємо всі версії
   if aws s3api get-bucket-versioning --bucket "$BUCKET_NAME" | grep -q Enabled; then
     echo "Бакет версіонований — видаляємо всі версії..."
-    
-    aws s3api list-object-versions --bucket "$BUCKET_NAME" --output json | jq -c '.Versions[]?, .DeleteMarkers[]?' |
-      while read -r obj; do
-        key=$(echo "$obj" | jq -r '.Key')
-        versionId=$(echo "$obj" | jq -r '.VersionId')
-        aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$versionId"
+
+    aws s3api list-object-versions --bucket "$BUCKET_NAME" \
+      --query='Versions[].{Key:Key,VersionId:VersionId}' \
+      --output=text |
+      while read -r key version_id; do
+        echo "Видалення об'єкта: $key версія: $version_id"
+        aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" || true
+      done
+
+    aws s3api list-object-versions --bucket "$BUCKET_NAME" \
+      --query='DeleteMarkers[].{Key:Key,VersionId:VersionId}' \
+      --output=text |
+      while read -r key version_id; do
+        echo "Видалення маркера: $key версія: $version_id"
+        aws s3api delete-object --bucket "$BUCKET_NAME" --key "$key" --version-id "$version_id" || true
       done
   fi
 
-  # Очищаємо звичайні об'єкти (на всяк випадок)
+  # Очищення звичайних об'єктів (якщо залишились)
+  echo "Видаляємо всі об'єкти (звичайна очистка)..."
   aws s3 rm "s3://$BUCKET_NAME" --recursive || true
 
   # Видаляємо сам бакет
@@ -230,3 +241,6 @@ if [[ -n "$BUCKET_NAME" ]]; then
 else
   echo "S3 bucket не знайдено, пропускаємо очищення"
 fi
+
+
+echo "Інфраструктуру видалено успішно!"

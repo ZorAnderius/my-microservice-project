@@ -24,5 +24,9 @@ locals {
   min_size = 1
 
   ecr_repo_url = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${local.region}.amazonaws.com/${local.ecr_name}"
+
+  #Grafana
+  grafana_release_name        = "monitoring"
+  grafana_namespace           = "monitoring"
 }
 

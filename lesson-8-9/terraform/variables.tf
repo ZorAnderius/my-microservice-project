@@ -44,7 +44,6 @@ variable "rds_database_name" {
   description = "Name of the RDS database"
   type        = string
   default     = "myapp"
-
 }
 
 variable "rds_publicly_accessible" {

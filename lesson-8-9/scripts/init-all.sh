@@ -93,6 +93,59 @@ kubectl create secret generic "$SECRET_NAME" \
 
 echo "Секрет $SECRET_NAME оновлено!"
 
+# --- Grafana ---
+echo ""
+echo "Налаштування доступу до Grafana..."
+
+GRAFANA_NAMESPACE=$(terraform -chdir="$PROJECT_ROOT/lesson-8-9/terraform" output -raw grafana_namespace 2>/dev/null || echo "monitoring")
+GRAFANA_SERVICE_NAME=$(kubectl get svc -n "$GRAFANA_NAMESPACE" -l app.kubernetes.io/name=grafana -o jsonpath="{.items[0].metadata.name}" 2>/dev/null)
+
+if [ -z "$GRAFANA_SERVICE_NAME" ]; then
+  echo "Grafana service не знайдено у namespace '$GRAFANA_NAMESPACE'"
+else
+  echo "Знайдено Grafana service: $GRAFANA_SERVICE_NAME"
+
+  # Знаходимо вільний локальний порт
+  echo "Шукаємо вільний локальний порт..."
+  function find_free_port() {
+    for port in {3000..3999}; do
+      if ! lsof -i :$port >/dev/null 2>&1; then
+        echo $port
+        return
+      fi
+    done
+    echo ""
+  }
+
+  LOCAL_PORT=$(find_free_port)
+
+  if [ -z "$LOCAL_PORT" ]; then
+    echo "Не знайдено вільного порту для port-forward у діапазоні 3000–3999"
+    exit 1
+  fi
+
+  echo "🔌 Використовуємо локальний порт: $LOCAL_PORT"
+  echo "Старт port-forward до Grafana у фоновому режимі..."
+  kubectl port-forward svc/"$GRAFANA_SERVICE_NAME" "$LOCAL_PORT":80 -n "$GRAFANA_NAMESPACE" >/dev/null 2>&1 &
+  GRAFANA_PORT_FORWARD_PID=$!
+
+  # Чекаємо, поки порт-форвард встановиться
+  sleep 5
+
+  echo "Отримуємо Grafana пароль з Kubernetes секрету..."
+  GRAFANA_PASSWORD=$(kubectl get secret -n "$GRAFANA_NAMESPACE" "$GRAFANA_SERVICE_NAME" -o jsonpath="{.data.admin-password}" 2>/dev/null | base64 --decode)
+
+  if [ -z "$GRAFANA_PASSWORD" ]; then
+    GRAFANA_PASSWORD=" Не вдалось отримати"
+  fi
+
+  echo ""
+  echo "Grafana:"
+  echo "   ➤ URL: http://localhost:$LOCAL_PORT"
+  echo "   ➤ Логін: admin"
+  echo "   ➤ Пароль: $GRAFANA_PASSWORD"
+  echo ""
+fi
 # --- ArgoCD ---
 ARGOCD_COMMAND=$(terraform -chdir="$PROJECT_ROOT/lesson-8-9/terraform" output -raw argocd_admin_password 2>/dev/null || echo "")
 

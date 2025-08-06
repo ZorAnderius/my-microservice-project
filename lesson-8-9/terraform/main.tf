@@ -69,6 +69,15 @@ provider "helm" {
   }
 }
 
+module "monitoring" {
+  source = "./modules/monitoring"
+  depends_on = [
+    module.eks
+  ]
+}
+
+
+
 module "jenkins" {
   source            = "./modules/jenkins"
   cluster_name      = module.eks.eks_cluster_name
@@ -95,10 +104,10 @@ module "argo_cd" {
   github_repo_url = var.github_repo_url
   github_branch   = var.github_branch
   ecr_repo_url    = local.ecr_repo_url
-  rds_db_name   = var.rds_database_name
-  rds_username  = var.rds_username
-  rds_password  = var.rds_password
-  rds_endpoint  = module.rds.rds_endpoint
+  rds_db_name     = var.rds_database_name
+  rds_username    = var.rds_username
+  rds_password    = var.rds_password
+  rds_endpoint    = module.rds.rds_endpoint
 
   depends_on = [module.eks]
 }
@@ -134,7 +143,7 @@ module "rds" {
   vpc_id                  = module.vpc.vpc_id
   multi_az                = var.rds_multi_az
   backup_retention_period = var.rds_backup_retention_period
-  parameters              = {
+  parameters = {
     max_connections            = "200"
     log_min_duration_statement = "500"
   }

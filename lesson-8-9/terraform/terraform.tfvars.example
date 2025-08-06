@@ -5,3 +5,4 @@ github_branch     =
 rds_username      = 
 rds_database_name = 
 rds_password      = 
+ grafana_admin_password = 
