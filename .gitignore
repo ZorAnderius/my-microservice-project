@@ -68,6 +68,10 @@ cython_debug/
 *.tmp
 
 
-lesson-5/.terraform/
+**/.terraform*
+*.tfstate
+*.tfstate.backup
+.crash
+.terraform.tfstate*
 
-.terraform/
+**.env
